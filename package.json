@@ -1,0 +1,46 @@
+{
+  "name": "capsule-emit-ts",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "description": "TypeScript producer and verifier for AAC format 4",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./aac": {
+      "types": "./dist/aac/index.d.ts",
+      "import": "./dist/aac/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "tsup && tsc -p tsconfig.build.json",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "oxlint src test",
+    "test": "vitest run --coverage",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "cborg": "6.1.2"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.0",
+    "@vitest/coverage-v8": "4.1.11",
+    "oxlint": "1.81.0",
+    "prettier": "3.6.2",
+    "tsup": "8.5.1",
+    "typescript": "7.0.2",
+    "vitest": "4.1.11"
+  }
+}
