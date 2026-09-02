@@ -29,6 +29,8 @@
     "format:check": "prettier --check .",
     "lint": "oxlint src test",
     "test": "vitest run --coverage",
+    "test:interop": "vitest run test/interop.test.ts",
+    "test:unit": "vitest run --coverage --exclude test/interop.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
