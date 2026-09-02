@@ -17,6 +17,9 @@ timestamps.
 | `capsule-emit-go`      | `280596e03070d6c3333224313fd6aa20b0cb992a` | Public producer API and behavior                  |
 | `capsule-emit`         | `40b592192e19622ff7a8c82674eb7caddb52e8db` | Released 0.7.0 Python byte-exact fixtures         |
 
+These revisions record the implementation baseline. CI interoperability jobs
+intentionally test the current change against each peer repository's `main`.
+
 The pinned and current AAC revisions do not differ under `spec/`, `go/`,
 `test-vectors/`, or `producer-envelope-vectors/`.
 

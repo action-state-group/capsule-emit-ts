@@ -1,41 +1,121 @@
 name: CI
-on: [push, pull_request]
-permissions: { contents: read }
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
+  quality:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with: { path: capsule-emit-ts }
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          {
-            repository: action-state-group/agent-action-capsule,
-            path: agent-action-capsule,
-            ref: 7e112c8b877ad79d4d2a53be7b522a63470a2b1d,
-          }
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Check formatting
+        run: npm run format:check
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+
+  test-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out capsule-emit-ts
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          {
-            repository: ethanyzhang/capsule-emit-go,
-            path: capsule-emit-go,
-            ref: 280596e03070d6c3333224313fd6aa20b0cb992a,
-          }
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+          path: capsule-emit-ts
+      - name: Check out Python reference main
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          {
-            node-version: 24,
-            cache: npm,
-            cache-dependency-path: capsule-emit-ts/package-lock.json,
-          }
-      - run: npm ci
+          repository: action-state-group/agent-action-capsule
+          ref: main
+          path: agent-action-capsule
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: capsule-emit-ts/package-lock.json
+      - name: Install dependencies
+        run: npm ci
         working-directory: capsule-emit-ts
-      - run: npm run check
+      - name: Test
+        run: npm run test:unit
         working-directory: capsule-emit-ts
-        env:
-          {
-            AAC_ROOT: ../agent-action-capsule,
-            CAPSULE_EMIT_GO_ROOT: ../capsule-emit-go,
-          }
-      - run: npm run build
+      - name: Build
+        run: npm run build
         working-directory: capsule-emit-ts
+
+  interoperability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out capsule-emit-ts
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: capsule-emit-ts
+      - name: Check out capsule-emit-go main
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: ethanyzhang/capsule-emit-go
+          ref: main
+          path: capsule-emit-go
+      - name: Check out Python emit main
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: action-state-group/capsule-emit
+          ref: main
+          path: capsule-emit
+      - name: Check out Python reference main
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: action-state-group/agent-action-capsule
+          ref: main
+          path: agent-action-capsule
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: capsule-emit-ts/package-lock.json
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: capsule-emit-go/go.mod
+          cache-dependency-path: capsule-emit-go/go.sum
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+      - name: Install Python emit main
+        run: |
+          python -m pip install -e ./agent-action-capsule/python
+          python -m pip install -e ./capsule-emit
+      - name: Generate live Python interoperability vectors
+        run: python capsule-emit-go/testdata/capsule-emit/format4-interop/scripts/generate_vectors.py
+      - name: Install capsule-emit-ts dependencies
+        run: npm ci
+        working-directory: capsule-emit-ts
+      - name: Verify Python vectors with TypeScript
+        run: npm run test:interop
+        working-directory: capsule-emit-ts
+      - name: Verify Python vectors with Go main
+        run: scripts/check-format4-interop.sh
+        working-directory: capsule-emit-go
