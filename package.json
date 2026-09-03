@@ -1,9 +1,17 @@
 {
-  "name": "capsule-emit-ts",
+  "name": "@action-state-group/capsule-emit",
   "version": "0.1.0",
   "license": "Apache-2.0",
   "description": "TypeScript producer and verifier for AAC format 4",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/action-state-group/capsule-emit-ts.git"
+  },
+  "homepage": "https://github.com/action-state-group/capsule-emit-ts#readme",
+  "bugs": {
+    "url": "https://github.com/action-state-group/capsule-emit-ts/issues"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -21,6 +29,9 @@
   ],
   "engines": {
     "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "tsup && tsc -p tsconfig.build.json",

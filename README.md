@@ -10,14 +10,10 @@ signers.
 
 ## Install
 
-Node.js 24 or newer is required. The package is not yet published to npm; use
-the public repository until the first release is published.
+Node.js 24 or newer is required.
 
 ```sh
-git clone https://github.com/action-state-group/capsule-emit-ts.git
-cd capsule-emit-ts
-npm ci
-npm run build
+npm install @action-state-group/capsule-emit
 ```
 
 ## Build, sign, and verify
@@ -33,7 +29,7 @@ import {
   seal,
   verifyCapsule,
   verifyEnvelope,
-} from "capsule-emit-ts";
+} from "@action-state-group/capsule-emit";
 
 const identity = createEd25519Identity(randomBytes(32));
 const result = seal({
@@ -92,7 +88,7 @@ import {
   received,
   sign,
   who,
-} from "capsule-emit-ts";
+} from "@action-state-group/capsule-emit";
 
 const identity = createEd25519Identity(randomBytes(32));
 const common = {
@@ -152,7 +148,7 @@ rejects duplicate object names, excessive depth, floats, unsafe integers,
 invalid UTF-8, and trailing JSON data on strict decoding paths.
 
 ```ts
-import { digestJSON } from "capsule-emit-ts";
+import { digestJSON } from "@action-state-group/capsule-emit";
 
 const requestDigest = digestJSON({ issue: 123, operation: "publish" });
 const responseDigest = digestJSON({ accepted: true });
@@ -163,7 +159,7 @@ fields where appropriate. Raw payload values never enter the Capsule.
 
 ## Verification and compatibility
 
-The `capsule-emit-ts/aac` subpath exposes strict JSON decoding, current and
+The `@action-state-group/capsule-emit/aac` subpath exposes strict JSON decoding, current and
 vintage Capsule-ID computation, Class 1 verification, and store verification
 for ledger implementations. Top-level construction and verification remain
 format-4-only.

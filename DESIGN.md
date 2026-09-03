@@ -74,7 +74,7 @@ the lexical rule above. Format-4 Capsule identity removes only top-level `capsul
 
 ## Low-level AAC compatibility subpath
 
-`capsule-emit-ts/aac` exports `decodeCapsuleJson`, `computeCapsuleId`,
+`@action-state-group/capsule-emit/aac` exports `decodeCapsuleJson`, `computeCapsuleId`,
 `verifyClass1`, and `verifyStore`. It mirrors the upstream AAC dependency used
 by both Go libraries. It retains vintage format-2 identity and store checks
 only so the AAC ledger binding in `cll-ts` can match current Go read behavior. Vintage
