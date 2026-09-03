@@ -141,6 +141,37 @@ format-4 Capsules. Carried and composed construction rejects explicit agent
 input/output digests because those records already own their construction
 commitments.
 
+## Compose with CLL
+
+This package constructs and verifies AAC records. It does not persist them.
+Applications that also need checkpointed inclusion install the independent CLL
+package, store the full Capsule and Producer Envelope in application storage,
+and append only the verified 32-byte Capsule ID to CLL.
+
+```ts
+import { build, verifyCapsule } from "@action-state-group/capsule-emit";
+import { MysqlStore } from "@action-state-group/cll/mysql";
+
+const built = build({
+  actionId: "deploy-42",
+  actionType: "fyi",
+  operator: "example-org",
+  developer: "example-agent@v1",
+  timestamp: new Date(),
+});
+verifyCapsule(built.json); // returns verified metadata or throws
+
+// Persist built.json and any Producer Envelope in application storage.
+const cll = await MysqlStore.open(process.env.MYSQL_URL!, "application-log");
+await cll.append({
+  value: Buffer.from(built.capsuleId, "hex"),
+  appendedAt: new Date(),
+});
+```
+
+Neither package depends on the other. An application that uses both declares
+both dependencies explicitly.
+
 ## JSON digests
 
 `digestJSON(value)` returns the lowercase SHA-256 of RFC 8785 JCS bytes. It
@@ -161,7 +192,7 @@ fields where appropriate. Raw payload values never enter the Capsule.
 
 The `@action-state-group/capsule-emit/aac` subpath exposes strict JSON decoding, current and
 vintage Capsule-ID computation, Class 1 verification, and store verification
-for ledger implementations. Top-level construction and verification remain
+for persistence adapters. Top-level construction and verification remain
 format-4-only.
 
 `isV4IrreversibilityClass(value)` tests membership in the four
