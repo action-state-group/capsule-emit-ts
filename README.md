@@ -214,6 +214,24 @@ npm run build
 Interop tests expect `agent-action-capsule` and `capsule-emit-go` as sibling
 checkouts. Override those paths with `AAC_ROOT` and `CAPSULE_EMIT_GO_ROOT`.
 
+## Release
+
+Releases are published from `main` with the manual
+[Publish npm package](https://github.com/action-state-group/capsule-emit-ts/actions/workflows/publish.yml)
+GitHub Action:
+
+1. Update `version` in `package.json` and `package-lock.json`, commit the change,
+   and wait for `main` CI to pass.
+2. In GitHub, open the workflow, choose **Run workflow**, and select `main`.
+3. Verify the workflow published `@action-state-group/capsule-emit` and created
+   the annotated `v<version>` tag on the published commit.
+
+The npm package must have a GitHub Actions trusted publisher configured for
+the `action-state-group/capsule-emit-ts` repository and
+`.github/workflows/publish.yml`. No long-lived npm token is required. Re-running
+the workflow is safe: it skips an existing npm version and verifies that its
+Git tag points to the `gitHead` recorded by npm.
+
 ## License
 
 Apache-2.0. The upstream Agent Action Capsule dependency is BSD-3-Clause.
