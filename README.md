@@ -172,6 +172,11 @@ await cll.append({
 Neither package depends on the other. An application that uses both declares
 both dependencies explicitly.
 
+`capsule-emit` creates no database tables. `MysqlStore.open()` and
+`SqliteStore.open()` create only CLL's internal tables, documented in the
+[`@action-state-group/cll` backend guide](https://github.com/action-state-group/cll-ts#sqlite-and-mysql-tables).
+Full Capsules and Producer Envelopes remain in application-owned storage.
+
 ## JSON digests
 
 `digestJSON(value)` returns the lowercase SHA-256 of RFC 8785 JCS bytes. It
