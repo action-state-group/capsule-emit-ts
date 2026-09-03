@@ -14,7 +14,7 @@ Node.js 24 or newer is required. The package is not yet published to npm; use
 the public repository until the first release is published.
 
 ```sh
-git clone https://github.com/ethanyzhang/capsule-emit-ts.git
+git clone https://github.com/action-state-group/capsule-emit-ts.git
 cd capsule-emit-ts
 npm ci
 npm run build

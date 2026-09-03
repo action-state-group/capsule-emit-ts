@@ -74,7 +74,7 @@ jobs:
       - name: Check out capsule-emit-go main
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          repository: ethanyzhang/capsule-emit-go
+          repository: action-state-group/capsule-emit-go
           ref: main
           path: capsule-emit-go
       - name: Check out Python emit main
