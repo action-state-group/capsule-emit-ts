@@ -40,7 +40,7 @@ const result = seal({
     developer: "example-agent@v1",
     timestamp: new Date("2026-09-02T12:00:00Z"),
     disposition: {
-      decision: "approve",
+      decision: "accept",
       approver: "policy",
       humanDisposed: false,
       verdictClass: "executed",
@@ -63,6 +63,12 @@ if (!envelope.ok) {
     `Producer Envelope failed: ${JSON.stringify(envelope.findings)}`,
   );
 }
+if (
+  !envelope.publicKey ||
+  !Buffer.from(envelope.publicKey).equals(Buffer.from(identity.publicKey))
+) {
+  throw new Error("Producer Envelope signer is not authorized");
+}
 ```
 
 `verifyCapsule` validates Capsule identity and Class 1 structure. It does not
@@ -83,9 +89,11 @@ import { randomBytes } from "node:crypto";
 import {
   build,
   buildComposition,
+  can,
   createEd25519Identity,
   did,
   received,
+  seal,
   sign,
   who,
 } from "@action-state-group/capsule-emit";
@@ -114,11 +122,12 @@ const actionCapsule = build({
   effect: {
     type: "example.publish",
     status: "planned",
-    irreversibilityClass: "reversible",
+    irreversibilityClass: "two_way",
   },
 });
 const composition = buildComposition({ ...common, actionId: "composition/1" }, [
   who(identityCapsule),
+  can(providerAck),
   did(actionCapsule),
 ]);
 const envelope = sign(composition, identity);
@@ -131,7 +140,7 @@ The same composition can use the high-level signing path:
 ```ts
 const signedComposition = seal({
   capsule: { ...common, actionId: "composition/2" },
-  members: [who(identityCapsule), did(actionCapsule)],
+  members: [who(identityCapsule), can(providerAck), did(actionCapsule)],
   identity,
 });
 ```
@@ -162,11 +171,17 @@ const built = build({
 verifyCapsule(built.json); // returns verified metadata or throws
 
 // Persist built.json and any Producer Envelope in application storage.
-const cll = await MysqlStore.open(process.env.MYSQL_URL!, "application-log");
-await cll.append({
-  value: Buffer.from(built.capsuleId, "hex"),
-  appendedAt: new Date(),
-});
+const mysqlUrl = process.env.MYSQL_URL;
+if (!mysqlUrl) throw new Error("MYSQL_URL is required");
+const cll = await MysqlStore.open(mysqlUrl, "application-log");
+try {
+  await cll.append({
+    value: Buffer.from(built.capsuleId, "hex"),
+    appendedAt: new Date(),
+  });
+} finally {
+  await cll.close();
+}
 ```
 
 Neither package depends on the other. An application that uses both declares
@@ -208,7 +223,63 @@ invalid.
 Tests replay the complete upstream AAC corpus, all Producer Envelope vectors,
 and Go/Python authored, received, WHO, DID, and composition fixtures.
 
+## Cross-record references
+
+`Input.references` accepts `{ type, digestAlg, digest, citationPurpose?,
+logCoordinates? }`. Use the registered type `agent-action-capsule` with
+`SHA-256` and its Capsule ID for an AAC citation. `acted_on` and `responds_to`
+are seeded citation purposes; unknown purposes remain informational. References
+cannot duplicate the same Capsule's chain parent. Foreign digest representations
+belong to the referenced CPB type and are not restricted to AAC's hex encoding.
+
+`logCoordinates` carries the wire members `log_id`, `leaf_index` and
+`inclusion_proof` together as opaque claims. Class 1 does not authenticate the
+proof or resolve external targets. Undefined references are omitted; `[]` is
+preserved, including its effect on the format-4 Capsule ID.
+
+```ts
+import { build, verifyCapsule } from "@action-state-group/capsule-emit";
+
+const common = {
+  actionType: "fyi" as const,
+  operator: "example-org",
+  developer: "example-agent@v1",
+  timestamp: "2026-09-02T12:00:00Z",
+};
+const request = build({ ...common, actionId: "request/1" });
+const response = build({
+  ...common,
+  actionId: "response/1",
+  references: [
+    {
+      type: "agent-action-capsule",
+      digestAlg: "SHA-256",
+      digest: request.capsuleId,
+      citationPurpose: "responds_to",
+    },
+  ],
+});
+verifyCapsule(response.json);
+console.log(request.capsuleId, response.capsuleId);
+```
+
+References enter through `Input`, including `seal({ capsule: { ... } })`.
+There is no separate reference builder or closed purpose enum.
+
 ## Development
+
+The embedded provisional registry snapshot mirrors
+`agent-action-capsule/python/agent_action_capsule/data/cpb_provisional.json`.
+Known provisional values change informational diagnostics without increasing
+assurance. Refresh the snapshot from that source; the test suite checks its
+provenance and content. Raw JCS still normalizes `-0` to `0`; Python's optional
+strict input verification tier is a separate acceptance policy.
+
+Shared reference and vocabulary vectors live in the AAC source checkout under
+`go/verify/testdata/`. The corresponding AAC source update must land before these
+tests run against its remote `main`. The producer-to-CLL check is maintained in
+`capsule-emit-go/scripts/check-producer-cll-interop.sh` and runs in both emitters'
+CI. It covers in-memory append/checkpoint interoperability without witness I/O.
 
 ```sh
 npm install

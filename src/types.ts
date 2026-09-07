@@ -39,6 +39,16 @@ export interface Chain {
   readonly parentCapsuleId: string;
   readonly relation: string;
 }
+
+/** A draft-04 §5.5.5 citation under the referenced artifact's CPB digest context. */
+export interface Reference {
+  readonly type: string;
+  readonly digestAlg: string;
+  readonly digest: string;
+  readonly citationPurpose?: string;
+  /** Opaque log_id, leaf_index and inclusion_proof claims; no proof is authenticated. */
+  readonly logCoordinates?: Readonly<Record<string, unknown>>;
+}
 export interface Input {
   readonly actionId: string;
   readonly actionType: "fyi" | "decide";
@@ -51,6 +61,7 @@ export interface Input {
   readonly disposition?: Disposition;
   readonly effect?: Effect;
   readonly chain?: Chain;
+  readonly references?: readonly Reference[];
   readonly model?: Model;
   readonly compute?: ComputeAttestation;
 }

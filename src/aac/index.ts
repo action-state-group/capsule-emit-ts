@@ -1,4 +1,8 @@
+import { referenceFindings } from "./references.js";
+import { provisionalClass } from "./provisional.js";
 import {
+  asJsonObject,
+  isHex64,
   decodeStrictJson,
   JcsFloatError,
   JcsUnsafeIntegerError,
@@ -9,6 +13,7 @@ import {
 } from "./json.js";
 
 export {
+  asJsonObject,
   decodeStrictJson,
   jcs,
   JcsFloatError,
@@ -33,18 +38,7 @@ export interface VerificationResult {
 }
 
 type RecordValue = Record<string, ParsedJson>;
-const hex64 = /^[0-9a-f]{64}$/u;
 
-export function asJsonObject(
-  value: ParsedJson | undefined,
-): RecordValue | undefined {
-  return value !== null &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
-    !(value instanceof JsonNumber)
-    ? value
-    : undefined;
-}
 const object = asJsonObject;
 
 function normalize(value: ParsedJson): ParsedJson {
@@ -151,6 +145,7 @@ const known = {
   irreversibility_class: v4IrreversibilityClasses,
   effect_attestation: new Set(["gate_executed", "runtime_claimed"]),
   "chain.relation": new Set(["confirms", "supersedes", "epoch_opens"]),
+  citation_purpose: new Set(["acted_on", "responds_to"]),
 } as const;
 
 /** AAC Class 1 verification. It always returns a structured result. */
@@ -186,6 +181,14 @@ export function verifyClass1(
       ],
       assurance: {},
     };
+  // Keep external-reference diagnostics within their existing check groups.
+  const references = referenceFindings(
+    top,
+    new Set([
+      ...known.citation_purpose,
+      ...(extensions.citation_purpose ?? []),
+    ]),
+  );
   for (const field of [
     "spec_version",
     "format_version",
@@ -202,7 +205,7 @@ export function verifyClass1(
       add("field_not_string", `${field} MUST be a string (§5.1)`, 1);
   }
   const carriedId =
-    typeof top.capsule_id === "string" && hex64.test(top.capsule_id)
+    typeof top.capsule_id === "string" && isHex64(top.capsule_id)
       ? top.capsule_id
       : undefined;
   if (typeof top.capsule_id === "string" && carriedId === undefined)
@@ -313,6 +316,8 @@ export function verifyClass1(
         "warning",
       );
   }
+  findings.push(...references.filter((finding) => finding.check === 1));
+
   let recomputed: string | undefined;
   if (carriedId !== undefined) {
     try {
@@ -337,7 +342,7 @@ export function verifyClass1(
     status === "confirmed" &&
     !(
       typeof effect?.response_digest === "string" &&
-      hex64.test(effect.response_digest)
+      isHex64(effect.response_digest)
     )
   )
     add(
@@ -350,7 +355,7 @@ export function verifyClass1(
       ? "not_applicable"
       : status === "confirmed" &&
           typeof effect.response_digest === "string" &&
-          hex64.test(effect.response_digest)
+          isHex64(effect.response_digest)
         ? "confirmed"
         : "dispatched_unconfirmed";
   const verdict =
@@ -402,7 +407,7 @@ export function verifyClass1(
     if (
       !(
         typeof chain.parent_capsule_id === "string" &&
-        hex64.test(chain.parent_capsule_id)
+        isHex64(chain.parent_capsule_id)
       )
     )
       add(
@@ -445,12 +450,14 @@ export function verifyClass1(
         );
     }
   }
+  findings.push(...references.filter((finding) => finding.check === 6));
+
   const crossParty = object(top.cross_party);
   let crossPartyRung: string | undefined;
   if (crossParty !== undefined)
     crossPartyRung =
       typeof crossParty.counterparty_ref === "string" &&
-      hex64.test(crossParty.counterparty_ref) &&
+      isHex64(crossParty.counterparty_ref) &&
       typeof crossParty.correlator === "string" &&
       crossParty.correlator !== ""
         ? crossParty.substantive === true
@@ -542,6 +549,16 @@ export function verifyClass1(
       ...(extensions[registry] ?? []),
     ]);
     if (typeof value === "string" && !accepted.has(value)) {
+      const provisional = provisionalClass(registry, value);
+      if (provisional !== undefined) {
+        add(
+          "known_provisional_registry_value",
+          `${member}=${JSON.stringify(value)} resolves known status 'provisional' via vendored CPB registry (payload class ${JSON.stringify(provisional)}); informational, not rejected (§12)`,
+          8,
+          "info",
+        );
+        continue;
+      }
       add(
         "unknown_registry_value",
         `${member}=${JSON.stringify(value)} is not a seeded ${registry} value; informational, not rejected (§12)`,
@@ -557,6 +574,8 @@ export function verifyClass1(
         );
     }
   }
+  findings.push(...references.filter((finding) => finding.check === 8));
+
   return {
     ok: !findings.some((finding) => finding.severity === "error"),
     findings,
