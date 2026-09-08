@@ -40,6 +40,22 @@ export type ParsedJson =
   | ParsedJson[]
   | { [key: string]: ParsedJson };
 
+/** Distinguish JSON objects from arrays and lossless number wrappers. */
+export function asJsonObject(
+  value: ParsedJson | undefined,
+): Record<string, ParsedJson> | undefined {
+  return value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    !(value instanceof JsonNumber)
+    ? value
+    : undefined;
+}
+/** AAC SHA-256 identifiers use exactly 64 lowercase hexadecimal digits. */
+export function isHex64(value: unknown): value is string {
+  return typeof value === "string" && /^[0-9a-f]{64}$/u.test(value);
+}
+
 /** Decode strict JSON without losing number spelling or accepting duplicate names. */
 export function decodeStrictJson(input: Uint8Array | string): ParsedJson {
   let text: string;

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { computeCapsuleId, jcs, jsonDigest } from "./aac/index.js";
+import { isHex64 } from "./aac/json.js";
 import { sign } from "./envelope.js";
 import {
   CANONICALIZATION_ID,
@@ -14,7 +15,6 @@ import {
 } from "./types.js";
 import { verifyCapsule } from "./verify.js";
 
-const hex64 = /^[0-9a-f]{64}$/u;
 const slots: readonly Slot[] = ["who", "can", "did", "audit"];
 const present = (value: string | undefined): value is string =>
   value !== undefined && value !== "";
@@ -66,14 +66,14 @@ function validate(input: Input): void {
       throw new TypeError("human-disposed decision requires human approver");
     if (
       present(input.disposition.reasonDigest) &&
-      !hex64.test(input.disposition.reasonDigest)
+      !isHex64(input.disposition.reasonDigest)
     )
       throw new TypeError(
         "disposition reason digest must be 64 lowercase hex characters",
       );
   }
   if (input.chain !== undefined) {
-    if (!hex64.test(input.chain.parentCapsuleId))
+    if (!isHex64(input.chain.parentCapsuleId))
       throw new TypeError(
         "chain parent capsule id must be 64 lowercase hex characters",
       );
@@ -91,7 +91,7 @@ function validate(input: Input): void {
     input.compute?.agentInputDigest,
     input.compute?.agentOutputDigest,
   ])
-    if (present(digest) && !hex64.test(digest))
+    if (present(digest) && !isHex64(digest))
       throw new TypeError(
         "compute attestation digest must be 64 lowercase hex characters",
       );
@@ -105,7 +105,7 @@ function validate(input: Input): void {
       input.effect.requestDigest,
       input.effect.responseDigest,
     ])
-      if (present(digest) && !hex64.test(digest))
+      if (present(digest) && !isHex64(digest))
         throw new TypeError(
           "effect digest must be 64 lowercase hex characters",
         );
@@ -202,6 +202,25 @@ export function build(input: Input): BuiltPayload {
       parent_capsule_id: input.chain.parentCapsuleId,
       relation: input.chain.relation,
     };
+
+  if (input.references !== undefined)
+    value.references = input.references.map((reference) =>
+      compact([
+        ["type", reference.type],
+        ["digest_alg", reference.digestAlg],
+        ["digest", reference.digest],
+        ["citation_purpose", reference.citationPurpose],
+        [
+          "log_coordinates",
+          reference.logCoordinates === undefined
+            ? undefined
+            : // Canonical JSON round-trip detaches nested caller-owned claims.
+              JSON.parse(
+                new TextDecoder().decode(jcs(reference.logCoordinates)),
+              ),
+        ],
+      ]),
+    );
   const compute =
     input.compute === undefined
       ? {}
