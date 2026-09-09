@@ -154,6 +154,39 @@ function compact(
 }
 
 export function build(input: Input): BuiltPayload {
+  return buildWithInternalCompute(input);
+}
+
+export function received(
+  input: Input,
+  artifact: Uint8Array,
+  artifactType: string,
+): BuiltPayload {
+  if (artifact.length === 0)
+    throw new TypeError("received artifact must not be empty");
+  requireText("received artifact type", artifactType);
+  const digest = createHash("sha256").update(artifact).digest("hex");
+  return buildWithInternalCompute(input, {
+    carried_artifact: { type: artifactType, digest_alg: "SHA-256", digest },
+    carried_input_digest: digest,
+  });
+}
+export function carry(input: Input, artifact: Uint8Array): BuiltPayload {
+  return received(input, artifact, "foreign-artifact");
+}
+
+function buildWithInternalCompute(
+  input: Input,
+  internal?: Record<string, unknown>,
+): BuiltPayload {
+  if (
+    internal !== undefined &&
+    (input.compute?.agentInputDigest !== undefined ||
+      input.compute?.agentOutputDigest !== undefined)
+  )
+    throw new TypeError(
+      "carried or composed binding must not include agent input or output digest",
+    );
   validate(input);
   const effectMode =
     input.effect === undefined || input.effect.status === "planned"
@@ -221,14 +254,16 @@ export function build(input: Input): BuiltPayload {
         ],
       ]),
     );
-  const compute =
-    input.compute === undefined
+  const compute = {
+    ...(input.compute === undefined
       ? {}
       : compact([
           ["agent_input_digest", input.compute.agentInputDigest],
           ["agent_output_digest", input.compute.agentOutputDigest],
           ["runtime", input.compute.runtime],
-        ]);
+        ])),
+    ...internal,
+  };
   const attestation = compact([
     ["model_id", input.model?.modelId],
     ["provider", input.model?.provider],
@@ -239,60 +274,6 @@ export function build(input: Input): BuiltPayload {
   ]);
   if (Object.keys(attestation).length !== 0)
     value.model_attestation = attestation;
-  const capsuleId = computeCapsuleId(
-    value as Parameters<typeof computeCapsuleId>[0],
-  );
-  value.capsule_id = capsuleId;
-  const json = jcs(value);
-  verifyCapsule(json);
-  return { capsuleId, value, json };
-}
-
-export function received(
-  input: Input,
-  artifact: Uint8Array,
-  artifactType: string,
-): BuiltPayload {
-  if (artifact.length === 0)
-    throw new TypeError("received artifact must not be empty");
-  requireText("received artifact type", artifactType);
-  const digest = createHash("sha256").update(artifact).digest("hex");
-  return buildWithInternalCompute(input, {
-    carried_artifact: { type: artifactType, digest_alg: "SHA-256", digest },
-    carried_input_digest: digest,
-  });
-}
-export function carry(input: Input, artifact: Uint8Array): BuiltPayload {
-  return received(input, artifact, "foreign-artifact");
-}
-
-function buildWithInternalCompute(
-  input: Input,
-  internal: Record<string, unknown>,
-): BuiltPayload {
-  if (
-    input.compute?.agentInputDigest !== undefined ||
-    input.compute?.agentOutputDigest !== undefined
-  )
-    throw new TypeError(
-      "carried or composed binding must not include agent input or output digest",
-    );
-  const built = build({
-    ...input,
-    ...(input.compute?.runtime === undefined
-      ? {}
-      : { compute: { runtime: input.compute.runtime } }),
-  });
-  const value = { ...built.value } as Record<string, unknown>;
-  const model = {
-    ...(value.model_attestation as Record<string, unknown> | undefined),
-  };
-  model.compute_attestation = {
-    ...(model.compute_attestation as Record<string, unknown> | undefined),
-    ...internal,
-  };
-  value.model_attestation = model;
-  delete value.capsule_id;
   const capsuleId = computeCapsuleId(
     value as Parameters<typeof computeCapsuleId>[0],
   );
