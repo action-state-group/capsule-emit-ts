@@ -66,11 +66,6 @@ function toBytes(value: Buffer): Uint8Array {
   return new Uint8Array(value);
 }
 
-function isBusy(error: unknown): boolean {
-  const code = (error as { code?: string }).code;
-  return code === "SQLITE_BUSY" || code === "SQLITE_LOCKED";
-}
-
 function isConstraint(error: unknown): boolean {
   return String((error as { code?: string }).code).startsWith(
     "SQLITE_CONSTRAINT",
@@ -85,7 +80,6 @@ function isConstraint(error: unknown): boolean {
  */
 export class SqliteArtifactStore implements Store {
   private readonly trusted: Uint8Array[];
-  private queue: Promise<unknown> = Promise.resolve();
 
   public constructor(
     private readonly db: Database,
@@ -104,29 +98,19 @@ export class SqliteArtifactStore implements Store {
 
   /** Creates v1 tables. Run explicitly during provisioning; no existing data is altered. */
   public async init(): Promise<void> {
-    await this.serialized(() => this.db.exec(SCHEMA));
+    this.db.exec(SCHEMA);
   }
 
   /** Persists an immutable record atomically, accepting byte-identical retries. */
   public async put(record: Record): Promise<void> {
-    await this.serialized(() => {
-      for (let attempt = 0; ; attempt += 1) {
-        try {
-          this.db.exec("BEGIN");
-          try {
-            this.putTx(record);
-            this.db.exec("COMMIT");
-            return;
-          } catch (error) {
-            this.db.exec("ROLLBACK");
-            throw error;
-          }
-        } catch (error) {
-          if (isBusy(error) && attempt < 9) continue;
-          throw error;
-        }
-      }
-    });
+    this.db.exec("BEGIN");
+    try {
+      this.putTx(record);
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
   }
 
   /**
@@ -179,17 +163,15 @@ export class SqliteArtifactStore implements Store {
 
   /** Loads a coherent snapshot and verifies authenticity and original digests. */
   public async get(id: string): Promise<Record> {
-    return this.serialized(() => {
-      this.db.exec("BEGIN");
-      try {
-        const record = this.readOnConnection(id);
-        this.db.exec("COMMIT");
-        return record;
-      } catch (error) {
-        this.db.exec("ROLLBACK");
-        throw error;
-      }
-    });
+    this.db.exec("BEGIN");
+    try {
+      const record = this.readOnConnection(id);
+      this.db.exec("COMMIT");
+      return record;
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
   }
 
   /** Reads within a caller-managed transaction. SQLite serializes writers. */
@@ -238,45 +220,24 @@ export class SqliteArtifactStore implements Store {
    */
   public async purge(id: string): Promise<void> {
     if (!ID_PATTERN.test(id)) throw new ArtifactError("invalid", "capsule id");
-    await this.serialized(() => {
-      for (let attempt = 0; ; attempt += 1) {
-        try {
-          this.db.exec("BEGIN");
-          try {
-            const existing = this.db
-              .prepare(
-                `SELECT capsule_id FROM capsule_store_capsules WHERE namespace=? AND capsule_id=?`,
-              )
-              .get(this.namespace, id) as { capsule_id: string } | undefined;
-            if (existing === undefined)
-              throw new ArtifactError("not_found", "capsule not found");
-            this.db
-              .prepare(
-                `UPDATE capsule_store_artifacts SET content_bytes=NULL, retention_state='purged', purged_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE namespace=? AND capsule_id=? AND retention_state='present'`,
-              )
-              .run(this.namespace, id);
-            this.db.exec("COMMIT");
-            return;
-          } catch (error) {
-            this.db.exec("ROLLBACK");
-            throw error;
-          }
-        } catch (error) {
-          if (isBusy(error) && attempt < 9) continue;
-          throw error;
-        }
-      }
-    });
-  }
-
-  // Serialize async access to the synchronous connection so overlapping callers
-  // never interleave BEGIN/COMMIT on the shared handle.
-  private serialized<T>(operation: () => T): Promise<T> {
-    const run = this.queue.then(operation, operation);
-    this.queue = run.then(
-      () => undefined,
-      () => undefined,
-    );
-    return run;
+    this.db.exec("BEGIN");
+    try {
+      const existing = this.db
+        .prepare(
+          `SELECT capsule_id FROM capsule_store_capsules WHERE namespace=? AND capsule_id=?`,
+        )
+        .get(this.namespace, id) as { capsule_id: string } | undefined;
+      if (existing === undefined)
+        throw new ArtifactError("not_found", "capsule not found");
+      this.db
+        .prepare(
+          `UPDATE capsule_store_artifacts SET content_bytes=NULL, retention_state='purged', purged_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE namespace=? AND capsule_id=? AND retention_state='present'`,
+        )
+        .run(this.namespace, id);
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
   }
 }

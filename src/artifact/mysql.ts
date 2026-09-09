@@ -56,6 +56,10 @@ function errno(error: unknown): number | undefined {
   return (error as { errno?: number }).errno;
 }
 
+function sleep(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
 function toBytes(value: Buffer): Uint8Array {
   return new Uint8Array(value);
 }
@@ -104,11 +108,15 @@ export class MysqlArtifactStore implements Store {
         return;
       } catch (error) {
         await connection.rollback();
-        if (errno(error) === DEADLOCK && attempt < 4) continue;
-        throw error;
+        if (errno(error) !== DEADLOCK || attempt >= 4) throw error;
       } finally {
         connection.release();
       }
+      // Deadlock: the connection is already released above, so we do not hold
+      // a pool slot while waiting. Mirror Go retryDeadlock: exponential backoff
+      // before replaying our own fully rolled-back transaction on a fresh
+      // connection.
+      await sleep((1 << attempt) * 10);
     }
   }
 
@@ -165,7 +173,6 @@ export class MysqlArtifactStore implements Store {
   public async get(id: string): Promise<Record> {
     const connection = await this.pool.getConnection();
     try {
-      await connection.query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ");
       await connection.beginTransaction();
       const record = await this.read(connection, id, false);
       await connection.commit();

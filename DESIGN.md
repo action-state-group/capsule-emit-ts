@@ -93,9 +93,11 @@ result when verification does not pass.
 ## Producer Envelope
 
 Node `crypto` supplies Ed25519. The Producer Envelope is tagged COSE_Sign1 with
-the raw 32-byte Capsule ID attached in its payload slot. Bounded CBOR primitives encode the protected
-map in frozen byte order: content type label 3, raw 32-byte public-key `kid`
-label 4, then EdDSA label 1. The signature covers
+the raw 32-byte Capsule ID attached in its payload slot. Hand-rolled CBOR
+primitives in `envelope.ts` (`head`, `bstr`, `tstr`, `array`,
+`protectedHeaders`) encode the protected map in frozen byte order: content type
+label 3, raw 32-byte public-key `kid` label 4, then EdDSA label 1. The signature
+covers
 `["Signature1", protected, empty-bstr, raw-id]`.
 
 Verification requires tag 18, four array items, empty unprotected map, exactly
@@ -109,7 +111,8 @@ Capsule matches the ID, then delegates to the same primitive.
 ## Toolchain
 
 Node.js 24 LTS, npm, TypeScript 7 strict mode, Vitest 4, and tsup are used.
-`cborg` supplies bounded deterministic CBOR primitives. GitHub Actions use
+Envelope encoding is hand-rolled in `envelope.ts`; `cborg` is used only to
+decode the protected header map during verification. GitHub Actions use
 read-only permissions and immutable action revisions.
 
 ## Artifact storage

@@ -160,18 +160,6 @@ class Reader {
     this.offset = end;
     return value;
   }
-  public text(): string {
-    return new TextDecoder("utf-8", { fatal: true }).decode(
-      this.take(this.length(3)),
-    );
-  }
-  public take(length: number): Uint8Array {
-    const end = this.offset + length;
-    if (end > this.data.length) throw new SyntaxError("truncated CBOR");
-    const value = this.data.slice(this.offset, end);
-    this.offset = end;
-    return value;
-  }
 }
 
 export function verifyEnvelope(
