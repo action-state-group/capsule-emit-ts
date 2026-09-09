@@ -4,9 +4,10 @@ Status: initial TypeScript implementation contract.
 
 ## Scope
 
-This ESM package builds, signs, and verifies AAC format-4 records. It does not
-persist, retry, witness, authorize signers, execute actions, or invent IDs and
-timestamps.
+This ESM package builds, signs, and verifies AAC format-4 records. The root
+entry point does not persist, retry, witness, execute actions, or invent IDs and
+timestamps. Optional persistence lives behind the `./artifact` subpath, which
+imports no storage driver into the root; see [Artifact storage](#artifact-storage).
 
 ## Source baseline
 
@@ -111,9 +112,39 @@ Node.js 24 LTS, npm, TypeScript 7 strict mode, Vitest 4, and tsup are used.
 `cborg` supplies bounded deterministic CBOR primitives. GitHub Actions use
 read-only permissions and immutable action revisions.
 
+## Artifact storage
+
+The optional `./artifact` subpath persists exact sealed Capsules, Producer
+Envelopes, and business originals. It neither seals nor appends to a CLL and is
+distinct from ledger maintenance, checkpointing, and witnessing. It is the
+byte-compatible TypeScript port of `capsule-emit-go`'s `artifact` package.
+
+`./artifact` exports the storage-driver-free core: the `Record`/`Artifact`
+model, retention states (`present`, `purged`, `never_retained`), digest bindings
+to the four supported format-4 locations, `prepare`, `verify` (which reuses
+`verifyCapsule`, `verifyEnvelope`, `decodePayload`, and `digestJSON`), and
+`storageChecksum`. Two backends build on it: `./artifact/sqlite` on
+`better-sqlite3` and `./artifact/mysql` on `mysql2`, declared as optional peer
+dependencies so importing the root pulls no database driver. Both share one
+`Store` contract with immutable records, byte-identical idempotent retry,
+`conflict` on divergence, fail-closed reads, purge tombstones, namespace
+scoping, caller-transaction joins, and the v1 limits (64 artifacts, 65,535-byte
+envelope, 8 MiB total).
+
+`storageChecksum` is byte-identical to the Go `StorageChecksum` — `sha256` over
+the normalized record marshaled with Go `encoding/json/v2`, reproduced here with
+`JSON.stringify` over a field-ordered projection, standard-base64 byte fields,
+and `omitempty` semantics — so a Go-written row and a TypeScript reader
+interoperate over a shared database. json/v2 encodes an empty inventory as `[]`
+(v1 used `null`), which `JSON.stringify([])` matches. Frozen Go golden vectors,
+including an empty-inventory case, pin this. MySQL integration tests are opt-in
+behind `ARTIFACT_MYSQL_TEST=1` and use testcontainers.
+
 ## Exclusions
 
 - format-2 or format-3 construction and top-level emitter verification;
 - Python persistence, pass-through, checkpoint, and witness conveniences;
-- implicit IDs or time, action execution, retries, storage, authorization,
-  anchors, policy evaluation, or application request/response projections.
+- implicit IDs or time, action execution, retries, root-level storage,
+  authorization, anchors, policy evaluation, or application request/response
+  projections. Verified artifact persistence is available only through the
+  opt-in `./artifact` subpath above.

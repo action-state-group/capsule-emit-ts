@@ -20,6 +20,18 @@
     "./aac": {
       "types": "./dist/aac/index.d.ts",
       "import": "./dist/aac/index.js"
+    },
+    "./artifact": {
+      "types": "./dist/artifact/index.d.ts",
+      "import": "./dist/artifact/index.js"
+    },
+    "./artifact/sqlite": {
+      "types": "./dist/artifact/sqlite.d.ts",
+      "import": "./dist/artifact/sqlite.js"
+    },
+    "./artifact/mysql": {
+      "types": "./dist/artifact/mysql.d.ts",
+      "import": "./dist/artifact/mysql.js"
     }
   },
   "files": [
@@ -47,9 +59,29 @@
   "dependencies": {
     "cborg": "6.1.2"
   },
+  "peerDependencies": {
+    "@types/better-sqlite3": ">=7",
+    "better-sqlite3": ">=11",
+    "mysql2": ">=3"
+  },
+  "peerDependenciesMeta": {
+    "@types/better-sqlite3": {
+      "optional": true
+    },
+    "better-sqlite3": {
+      "optional": true
+    },
+    "mysql2": {
+      "optional": true
+    }
+  },
   "devDependencies": {
+    "@testcontainers/mysql": "11.7.2",
+    "@types/better-sqlite3": "7.6.13",
     "@types/node": "24.3.0",
     "@vitest/coverage-v8": "4.1.11",
+    "better-sqlite3": "13.0.3",
+    "mysql2": "3.24.3",
     "oxlint": "1.81.0",
     "prettier": "3.6.2",
     "tsup": "8.5.1",

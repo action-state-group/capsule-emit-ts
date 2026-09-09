@@ -4,9 +4,10 @@ TypeScript-native AAC format-4 producer and verifier. The package is ESM-first,
 uses strict TypeScript, preserves signer-independent Capsule IDs, and emits the
 same attached-payload COSE Producer Envelopes as `capsule-emit-go`.
 
-It builds records only. It does not execute actions, generate business IDs or
-timestamps, persist Capsules, retry effects, contact witnesses, or authorize
-signers.
+The root entry point builds records only. It does not execute actions, generate
+business IDs or timestamps, persist Capsules, retry effects, contact witnesses,
+or authorize signers. Optional verified persistence is available behind the
+[`./artifact`](#artifact-storage) subpath.
 
 ## Install
 
@@ -265,6 +266,50 @@ console.log(request.capsuleId, response.capsuleId);
 
 References enter through `Input`, including `seal({ capsule: { ... } })`.
 There is no separate reference builder or closed purpose enum.
+
+## Artifact storage
+
+The optional `./artifact` subpath persists exact sealed Capsules, Producer
+Envelopes, and business originals. The root entry point stays storage-free:
+`better-sqlite3` and `mysql2` are optional peer dependencies, and an application
+installs only the backend it imports. TypeScript users of the SQLite backend
+also install `@types/better-sqlite3` (an optional peer dependency), because
+`better-sqlite3` ships no bundled type declarations; `mysql2` bundles its own. Reads verify Capsule identity, the
+Producer Envelope against caller-owned trusted keys, the storage inventory, and
+every retained bound original before returning. Records are immutable,
+byte-identical retries are idempotent, and a divergent write for the same
+Capsule ID throws an `ArtifactError` with `code: "conflict"`.
+
+```ts
+import Database from "better-sqlite3";
+import { PAYLOAD_DIGEST } from "@action-state-group/capsule-emit/artifact";
+import { SqliteArtifactStore } from "@action-state-group/capsule-emit/artifact/sqlite";
+
+const db = new Database("artifacts.db");
+db.pragma("foreign_keys = ON");
+const store = new SqliteArtifactStore(db, "my-namespace", [trustedPublicKey]);
+await store.init(); // provision v1 tables once during deployment
+
+await store.put({
+  capsuleId: sealed.capsuleId,
+  capsule: sealed.payload,
+  producerEnvelope: sealed.envelope,
+  artifacts: [
+    {
+      name: "payload",
+      binding: PAYLOAD_DIGEST,
+      content: payloadBytes,
+      state: "present",
+    },
+  ],
+});
+const record = await store.get(sealed.capsuleId);
+```
+
+`./artifact/mysql` exposes the same API over a `mysql2` pool. The inventory
+checksum is byte-compatible with `capsule-emit-go`, so a Go writer and a
+TypeScript reader interoperate over a shared database. See
+[DESIGN.md](DESIGN.md#artifact-storage) for the full contract.
 
 ## Development
 
