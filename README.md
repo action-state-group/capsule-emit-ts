@@ -11,7 +11,7 @@ or authorize signers. Optional verified persistence is available behind the
 
 ## Install
 
-Node.js 24 or newer is required.
+Node.js 22 or newer is required.
 
 ```sh
 npm install @action-state-group/capsule-emit
