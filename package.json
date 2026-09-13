@@ -32,6 +32,10 @@
     "./artifact/mysql": {
       "types": "./dist/artifact/mysql.d.ts",
       "import": "./dist/artifact/mysql.js"
+    },
+    "./artifact/jsonl": {
+      "types": "./dist/artifact/jsonl.d.ts",
+      "import": "./dist/artifact/jsonl.js"
     }
   },
   "files": [

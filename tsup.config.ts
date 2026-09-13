@@ -7,6 +7,7 @@ export default defineConfig({
     "artifact/index": "src/artifact/index.ts",
     "artifact/sqlite": "src/artifact/sqlite.ts",
     "artifact/mysql": "src/artifact/mysql.ts",
+    "artifact/jsonl": "src/artifact/jsonl.ts",
   },
   format: ["esm"],
   dts: false,

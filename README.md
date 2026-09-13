@@ -275,8 +275,10 @@ Envelopes, and business originals. The root entry point stays storage-free:
 installs only the backend it imports. TypeScript users of the SQLite backend
 also install `@types/better-sqlite3` (an optional peer dependency), because
 `better-sqlite3` ships no bundled type declarations; `mysql2` bundles its own. Reads verify Capsule identity, the
-Producer Envelope against caller-owned trusted keys, the storage inventory, and
-every retained bound original before returning. Records are immutable,
+Producer Envelope against caller-owned trusted keys, and every retained bound
+original before returning. The SQL backends additionally verify a stored
+inventory checksum; the JSONL backend has none, so it verifies the retained
+contents but not inventory completeness. Records are immutable,
 byte-identical retries are idempotent, and a divergent write for the same
 Capsule ID throws an `ArtifactError` with `code: "conflict"`.
 
@@ -310,6 +312,17 @@ const record = await store.get(sealed.capsuleId);
 checksum is byte-compatible with `capsule-emit-go`, so a Go writer and a
 TypeScript reader interoperate over a shared database. See
 [DESIGN.md](DESIGN.md#artifact-storage) for the full contract.
+
+`./artifact/jsonl` (`JsonlArtifactStore`) exposes the same
+`init`/`put`/`get`/`purge` API over a single flat JSONL file and needs no peer
+dependency — it uses Node's built-in `fs`. Each record is one line in the same
+`snake_case` wire shape as the other backends, so its files are byte-compatible
+with the `capsule-emit-go` `artifact/jsonl` store in either direction. `put`
+appends a line and `get` seeks to an in-memory `capsuleId`-to-offset index built
+on open; `purge` rewrites the file through a temp file and atomic rename. It
+assumes a single writer and provides no file locking, no crash-atomicity beyond
+that rename, and no transaction-join API. `init` creates the file, and `put`
+requires it to already exist.
 
 ## Development
 

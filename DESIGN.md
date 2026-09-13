@@ -126,13 +126,15 @@ byte-compatible TypeScript port of `capsule-emit-go`'s `artifact` package.
 model, retention states (`present`, `purged`, `never_retained`), digest bindings
 to the four supported format-4 locations, `prepare`, `verify` (which reuses
 `verifyCapsule`, `verifyEnvelope`, `decodePayload`, and `digestJSON`), and
-`storageChecksum`. Two backends build on it: `./artifact/sqlite` on
-`better-sqlite3` and `./artifact/mysql` on `mysql2`, declared as optional peer
-dependencies so importing the root pulls no database driver. Both share one
-`Store` contract with immutable records, byte-identical idempotent retry,
-`conflict` on divergence, fail-closed reads, purge tombstones, namespace
-scoping, caller-transaction joins, and the v1 limits (64 artifacts, 65,535-byte
-envelope, 8 MiB total).
+`storageChecksum`. Three backends build on it: `./artifact/sqlite` on
+`better-sqlite3` and `./artifact/mysql` on `mysql2` (declared as optional peer
+dependencies so importing the root pulls no database driver), and
+`./artifact/jsonl` on a single flat file using Node's built-in `fs` (no peer
+dependency). All share one `Store` contract with immutable records,
+byte-identical idempotent retry, `conflict` on divergence, fail-closed reads,
+purge tombstones, namespace scoping, and the v1 limits (64 artifacts,
+65,535-byte envelope, 8 MiB total); the SQL backends additionally support
+caller-transaction joins, which the JSONL backend does not.
 
 `storageChecksum` is byte-identical to the Go `StorageChecksum` — `sha256` over
 the normalized record marshaled with Go `encoding/json/v2`, reproduced here with
