@@ -148,6 +148,24 @@ jobs:
           npm --prefix capsule-emit-ts run build
           npm --prefix cll-ts ci
           npm --prefix cll-ts run build
+      - name: Adapt peer fixture to async producer APIs
+        run: |
+          python - <<'PYTHON'
+          from pathlib import Path
+
+          # The peer fixture calls emit's former synchronous APIs. Keep its
+          # interop orchestration and adapt only these test-only calls.
+          path = Path("capsule-emit-go/testdata/producer-cll/driver.mjs")
+          source = path.read_text()
+          for name in ("seal", "verifyCapsule", "verifyEnvelope"):
+              old = f"= emit.{name}("
+              new = f"= await emit.{name}("
+              if source.count(old) == 1 and source.count(new) == 0:
+                  source = source.replace(old, new)
+              elif source.count(old) != 0 or source.count(new) != 1:
+                  raise RuntimeError(f"unexpected peer fixture call shape: {name}")
+          path.write_text(source)
+          PYTHON
       - name: Verify producer to CLL interoperability
         run: scripts/check-producer-cll-interop.sh
         working-directory: capsule-emit-go
