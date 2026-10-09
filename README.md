@@ -1,3 +1,5 @@
+> **Archived 2026-10-09.** Development continues at [action-state-group/capsule-emit](https://github.com/action-state-group/capsule-emit) under `ts/`. The npm package name is unchanged until the consumer cutover.
+
 # capsule-emit-ts
 
 TypeScript-native AAC format-4 producer and verifier. The package is ESM-first,
